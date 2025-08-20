@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Script Hub</title>
+  <title>My GitHub Script Viewer</title>
   <style>
     body {
       font-family: monospace;
@@ -10,7 +10,6 @@
       color: #c9d1d9;
       padding: 20px;
     }
-    h1 { color: #58a6ff; }
     pre {
       background: #161b22;
       padding: 15px;
@@ -28,72 +27,32 @@
       border-radius: 5px;
       cursor: pointer;
     }
-    button:hover { background: #2ea043; }
-    #scripts {
-      margin-top: 20px;
-    }
-    .script-block {
-      margin-bottom: 25px;
+    button:hover {
+      background: #2ea043;
     }
   </style>
 </head>
 <body>
-  <h1>ZumHub Script Hub</h1>
-
-  <button onclick="addScript()">➕ Add Script</button>
-
-  <div id="scripts"></div>
+  <h1>My GitHub Script</h1>
+  <pre id="scriptBox">Loading script...</pre>
+  <button onclick="copyScript()">Copy Script</button>
 
   <script>
-    const scriptsDiv = document.getElementById("scripts");
+    const url = "https://github.com/UwURaww/ZumHub-Script-Hub"; // change this
 
-    function addScript() {
-      const mode = prompt("Choose mode:\n1. Loadstring URL\n2. Raw Script");
-
-      if (!mode) return;
-
-      if (mode === "1") {
-        const url = prompt("Enter raw GitHub URL:");
-        if (!url) return;
-        const wrapped = `loadstring(game:HttpGet("${url}"))()`;
-        showScript("Loadstring Script", wrapped);
-
-      } else if (mode === "2") {
-        const code = prompt("Paste your raw script code:");
-        if (!code) return;
-
-        const choice = prompt("Choose:\n1. Just raw code\n2. Make it loadstring");
-        if (!choice) return;
-
-        if (choice === "1") {
-          showScript("Raw Script", code);
-
-        } else if (choice === "2") {
-          // Save raw code as GitHub raw link substitute (pretend link)
-          const encoded = encodeURIComponent(code);
-          const fakeUrl = "data:text/plain;base64," + btoa(code);
-          const wrapped = `loadstring(game:HttpGet("${fakeUrl}"))()`;
-          showScript("Loadstring (from raw)", wrapped);
-        }
-      }
+    async function loadScript() {
+      const res = await fetch(url);
+      const text = await res.text();
+      document.getElementById("scriptBox").textContent = text;
     }
 
-    function showScript(title, content) {
-      const block = document.createElement("div");
-      block.className = "script-block";
-      block.innerHTML = `
-        <h2>${title}</h2>
-        <pre>${content}</pre>
-        <button onclick="copyScript(this)">Copy Script</button>
-      `;
-      scriptsDiv.appendChild(block);
-    }
-
-    function copyScript(btn) {
-      const text = btn.previousElementSibling.textContent;
+    function copyScript() {
+      const text = document.getElementById("scriptBox").textContent;
       navigator.clipboard.writeText(text);
       alert("Script copied!");
     }
+
+    loadScript();
   </script>
 </body>
 </html>
