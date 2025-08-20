@@ -1,50 +1,93 @@
-<!-- FILE: index.html --><!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Key Portal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Lua Obfuscator</title>
   <style>
-    :root { --bg:#0b1020; --muted:#9aa4c7; --accent:#6ea8ff; }
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(1000px 600px at 20% 10%,#1a2547 0%,#0b1020 60%);color:#e6ecff;font-family:Inter,system-ui,Arial,sans-serif}
-    .card{width:min(92vw,520px);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);padding:28px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.4);backdrop-filter: blur(6px)}
-    h1{margin:0 0 8px;font-size:28px}
-    p{margin:0 0 18px;color:var(--muted)}
-    .row{display:flex;gap:10px}
-    input{flex:1;background:#0f1530;border:1px solid rgba(255,255,255,.12);color:#e6ecff;padding:12px 14px;border-radius:12px;outline:none}
-    button{background:linear-gradient(180deg,#5ea1ff,#3978ff);border:none;color:white;padding:12px 16px;border-radius:12px;font-weight:600;cursor:pointer}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .hint{font-size:12px;color:var(--muted);margin-top:10px}
-    .msg{margin-top:14px;padding:10px 12px;border-radius:10px;display:none}
-    .msg.ok{display:block;background:rgba(80,200,120,.12);border:1px solid rgba(80,200,120,.35)}
-    .msg.err{display:block;background:rgba(255,100,100,.12);border:1px solid rgba(255,100,100,.35)}
-    .footer{margin-top:16px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
-    a{color:var(--accent)}
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; text-align:center; }
+    textarea { width:90%; height:150px; margin:10px 0; background:#222; color:#eee; border:1px solid #444; padding:10px; }
+    .btn { padding:10px 20px; margin:5px; border:none; border-radius:6px; cursor:pointer; background:#3b82f6; color:white; }
+    .btn:hover { background:#2563eb; }
+    select, label { margin:5px; }
+    .options { margin:15px 0; }
   </style>
-  <!--
-    DEPLOYMENT NOTES (GitHub Pages):
-    - Put this file at the root of your repo.
-    - Add main.js, success.html and tos.html in the same root.
-  -->
 </head>
 <body>
-  <div class="card">
-    <h1>🔑 Enter Access Key</h1>
-    <p>Paste the key you received to unlock the script link.</p>
-    <div class="row">
-      <input id="key" placeholder="e.g. AB12-34CD-56EF" autocomplete="one-time-code" />
-      <button id="submit">Unlock</button>
-    </div>
-    <div class="hint">Keys are verified securely by our server.</div>
-    <div id="msg" class="msg"></div>
-    <div class="footer">
-      <span>Mode: <strong>serverless</strong></span>
-      <a href="./tos.html">Terms</a>
-    </div>
+  <h1>🔒 Lua Obfuscator</h1>
+
+  <h3>1. Paste your Lua code:</h3>
+  <textarea id="inputCode" placeholder="Paste your Lua script here..."></textarea>
+
+  <h3>2. Select Output Target:</h3>
+  <select id="target">
+    <option value="executor">Roblox Executor</option>
+    <option value="other">Other</option>
+  </select>
+
+  <h3>3. Choose Obfuscation Features:</h3>
+  <div class="options">
+    <label><input type="checkbox" id="normal"> Normal</label>
+    <label><input type="checkbox" id="hard"> Hard</label>
+    <label><input type="checkbox" id="rename"> Rename Variables</label>
+    <label><input type="checkbox" id="encrypt"> Encrypt Strings</label>
+    <label><input type="checkbox" id="anti"> Add Anti-Tamper</label>
   </div>
-  <script type="module" src="./main.js"></script>
+
+  <button class="btn" onclick="obfuscate()">Obfuscate</button>
+
+  <h3>4. Result:</h3>
+  <textarea id="outputCode" readonly placeholder="Your obfuscated script will appear here..."></textarea><br>
+
+  <button class="btn" onclick="copyCode()">Copy</button>
+  <button class="btn" onclick="downloadCode()">Download</button>
+
+  <script>
+    function fakeObfuscate(code, options) {
+      // very simple demo obfuscation
+      let result = code;
+      if (options.normal) result = result.replace(/print/g, "p0");
+      if (options.hard) result = btoa(result); // Base64 encode
+      if (options.rename) result = result.replace(/local/g, "l0c");
+      if (options.encrypt) result = result.split("").reverse().join("");
+      if (options.anti) result = "-- Anti-Tamper Enabled\n" + result;
+      return result;
+    }
+
+    function obfuscate() {
+      const code = document.getElementById("inputCode").value;
+      const target = document.getElementById("target").value;
+      const options = {
+        normal: document.getElementById("normal").checked,
+        hard: document.getElementById("hard").checked,
+        rename: document.getElementById("rename").checked,
+        encrypt: document.getElementById("encrypt").checked,
+        anti: document.getElementById("anti").checked
+      };
+      
+      let obf = fakeObfuscate(code, options);
+      
+      if (target === "executor") {
+        obf = `loadstring([[\n${obf}\n]])()`;
+      }
+      
+      document.getElementById("outputCode").value = obf;
+    }
+
+    function copyCode() {
+      const output = document.getElementById("outputCode");
+      output.select();
+      document.execCommand("copy");
+      alert("Copied to clipboard!");
+    }
+
+    function downloadCode() {
+      const output = document.getElementById("outputCode").value;
+      const blob = new Blob([output], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "obfuscated.lua";
+      a.click();
+    }
+  </script>
 </body>
 </html>
