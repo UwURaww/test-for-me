@@ -1,166 +1,196 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"; import { motion, AnimatePresence } from "framer-motion"; import { Button } from "@/components/ui/button"; import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"; import { Input } from "@/components/ui/input"; import { Label } from "@/components/ui/label"; import { ScrollArea } from "@/components/ui/scroll-area"; import { Separator } from "@/components/ui/separator"; import { Badge } from "@/components/ui/badge"; import { toast } from "sonner"; import { Plus, Loader2, Lock, ShieldCheck, ExternalLink, Copy, Trash2, RefreshCw, Search } from "lucide-react";
-
-/**
-
-GitHub Raw Viewer — single-file React app
-
-Stores scripts locally (this device only) in localStorage
-
-
-"Owner Mode" gate so only your device can add/edit/delete
-
-
-Add Script modal with Name + Raw GitHub URL
-
-
-Fetches and displays file contents in beautiful code cards
-
-
-Per-card: Copy, Open Raw, Refresh, (Delete in Owner Mode)
-
-
-Search by title */
-
-
-
-const STORAGE_KEYS = { scripts: "gh_raw_viewer:scripts", ownerPassSet: "gh_raw_viewer:ownerPassSet", ownerPass: "gh_raw_viewer:ownerPass", // stored locally on this device only ownerMode: "gh_raw_viewer:ownerMode", };
-
-function loadLocal(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } } function saveLocal(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
-
-function isLikelyRawUrl(url) { try { const u = new URL(url); return ( u.hostname === "raw.githubusercontent.com" || u.hostname === "gist.githubusercontent.com" || /github.com/.+/raw/.test(u.href) ); } catch { return false; } }
-
-export default function App() { const [ownerMode, setOwnerMode] = useState(() => !!loadLocal(STORAGE_KEYS.ownerMode, false)); const [ownerPassSet, setOwnerPassSet] = useState(() => !!loadLocal(STORAGE_KEYS.ownerPassSet, false)); const [showOwnerDialog, setShowOwnerDialog] = useState(false); const [passInput, setPassInput] = useState("");
-
-const [scripts, setScripts] = useState(() => loadLocal(STORAGE_KEYS.scripts, [])); const [isAddOpen, setIsAddOpen] = useState(false); const [newName, setNewName] = useState(""); const [newUrl, setNewUrl] = useState(""); const [loadingId, setLoadingId] = useState(null); const [query, setQuery] = useState("");
-
-useEffect(() => { saveLocal(STORAGE_KEYS.scripts, scripts); }, [scripts]);
-
-useEffect(() => { saveLocal(STORAGE_KEYS.ownerMode, ownerMode); }, [ownerMode]);
-
-const filtered = useMemo(() => { if (!query.trim()) return scripts; return scripts.filter((s) => s.name.toLowerCase().includes(query.toLowerCase())); }, [scripts, query]);
-
-const enableOwnerMode = () => setShowOwnerDialog(true);
-
-const handleOwnerConfirm = () => { const existing = loadLocal(STORAGE_KEYS.ownerPass, ""); if (!ownerPassSet) { if (passInput.trim().length < 4) { toast.error("Passcode must be at least 4 characters."); return; } saveLocal(STORAGE_KEYS.ownerPass, passInput); saveLocal(STORAGE_KEYS.ownerPassSet, true); setOwnerPassSet(true); setOwnerMode(true); toast.success("Owner Mode enabled on this device."); setShowOwnerDialog(false); setPassInput(""); return; } if (existing && passInput === existing) { setOwnerMode(true); toast.success("Owner Mode enabled."); setShowOwnerDialog(false); setPassInput(""); } else { toast.error("Wrong passcode for this device."); } };
-
-const disableOwnerMode = () => { setOwnerMode(false); toast("Owner Mode disabled."); };
-
-async function fetchContent(url) { const res = await fetch(url, { cache: "no-store" }); if (!res.ok) throw new Error(HTTP ${res.status}); return await res.text(); }
-
-async function addScript() { if (!newName.trim() || !newUrl.trim()) { toast.error("Please enter a name and a raw GitHub link."); return; } if (!isLikelyRawUrl(newUrl)) { toast("Tip: use a direct RAW link from GitHub for best results."); } const id = crypto.randomUUID(); setLoadingId(id); try { const content = await fetchContent(newUrl); const item = { id, name: newName.trim(), url: newUrl.trim(), content, lastFetched: Date.now(), }; setScripts((prev) => [item, ...prev]); setIsAddOpen(false); setNewName(""); setNewUrl(""); toast.success("Script added."); } catch (e) { toast.error(Failed to fetch: ${e.message}); } finally { setLoadingId(null); } }
-
-async function refreshScript(id) { const idx = scripts.findIndex((s) => s.id === id); if (idx === -1) return; setLoadingId(id); try { const content = await fetchContent(scripts[idx].url); const updated = { ...scripts[idx], content, lastFetched: Date.now() }; const next = [...scripts]; next[idx] = updated; setScripts(next); toast.success("Refreshed."); } catch (e) { toast.error(Refresh failed: ${e.message}); } finally { setLoadingId(null); } }
-
-function deleteScript(id) { setScripts((prev) => prev.filter((s) => s.id !== id)); toast("Deleted."); }
-
-function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => toast.success("Copied to clipboard.")); }
-
-return ( <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900"> {/* Top bar /} <header className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/60 bg-white/70 border-b"> <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3"> {/ Top-left Add button (only visible in Owner Mode) */} {ownerMode ? ( <Button onClick={() => setIsAddOpen(true)} className="rounded-2xl shadow" size="sm"> <Plus className="mr-2 h-4 w-4" /> Add Script </Button> ) : ( <div className="w-[112px]" /> )}
-
-<Separator orientation="vertical" className="mx-1 h-6" />
-
-      <h1 className="font-semibold text-lg sm:text-xl tracking-tight">GitHub Raw Viewer</h1>
-      <Badge variant="secondary" className="ml-2 hidden sm:inline-flex">Professional</Badge>
-
-      <div className="ml-auto flex items-center gap-2">
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 opacity-60" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title..."
-            className="pl-8 w-48 md:w-64 rounded-2xl"
-          />
-        </div>
-
-        {/* Owner Mode controls */}
-        {ownerMode ? (
-          <Button variant="outline" size="sm" className="rounded-2xl" onClick={disableOwnerMode}>
-            <ShieldCheck className="mr-2 h-4 w-4" /> Owner Mode
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" className="rounded-2xl" onClick={enableOwnerMode}>
-            <Lock className="mr-2 h-4 w-4" /> Enable Owner Mode
-          </Button>
-        )}
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Raw Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9fafb;
+      color: #111827;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #1e40af; }
+    .container { max-width: 900px; margin: 20px auto; padding: 0 16px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .card-title { font-weight: bold; font-size: 15px; }
+    pre {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    .actions button {
+      margin-left: 6px;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .actions button:hover { background: #e5e7eb; }
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="addBtn">Add Script</button>
+    <h1>GitHub Raw Viewer</h1>
+  </header>  <div class="container" id="scriptList"></div>  <div class="modal" id="modal">
+    <div class="modal-content">
+      <h2 style="margin-bottom:12px;">Add New Script</h2>
+      <input type="text" id="scriptName" placeholder="Script Name">
+      <input type="text" id="scriptUrl" placeholder="Raw GitHub Link">
+      <div style="text-align:right;">
+        <button onclick="closeModal()">Cancel</button>
+        <button onclick="confirmAdd()">Confirm</button>
       </div>
     </div>
-  </header>
+  </div>  <script>
+    const listEl = document.getElementById('scriptList');
+    const modal = document.getElementById('modal');
+    const nameInput = document.getElementById('scriptName');
+    const urlInput = document.getElementById('scriptUrl');
+    let scripts = JSON.parse(localStorage.getItem('scripts') || '[]');
 
-  {/* Content grid */}
-  <main className="max-w-6xl mx-auto px-4 py-6">
-    {filtered.length === 0 ? (
-      <EmptyState ownerMode={ownerMode} onAdd={() => setIsAddOpen(true)} />
-    ) : (
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-        <AnimatePresence>
-          {filtered.map((s) => (
-            <motion.div
-              key={s.id}
-              layout
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Card className="rounded-2xl shadow-sm border-slate-200">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base font-semibold truncate max-w-[60%]" title={s.name}>
-                    {s.name}
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => window.open(s.url, "_blank")}
-                      title="Open raw link"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyToClipboard(s.content)}
-                      title="Copy content"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => refreshScript(s.id)}
-                      title="Refresh content"
-                      disabled={loadingId === s.id}
-                    >
-                      {loadingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    </Button>
-                    {ownerMode && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-600"
-                        onClick={() => deleteScript(s.id)}
-                        title="Delete (this device only)"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xs text-slate-500 mb-2">
-                    <span className="font-medium">Last fetched:</span>{" "}
-                    {new Date(s.lastFetched).toLocaleString()} 
-                  </div>
-                  <div className="border rounded-xl overflow-hidden">
-                    <ScrollArea className="h-64">
-                      <pre className="p-4 text-sm leading-relaxed whitespace-pre-wrap font-mono">
-                        {s.content}
-                      </pre>
-                    </ScrollArea>
+    function render() {
+      listEl.innerHTML = '';
+      if (scripts.length === 0) {
+        listEl.innerHTML = '<p style="text-align:center; color:#6b7280;">No scripts yet. Add one!</p>';
+        return;
+      }
+      scripts.forEach((s, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="card-title">${s.name}</span>
+            <div class="actions">
+              <button onclick="copyScript(${i})">Copy</button>
+              <button onclick="refreshScript(${i})">Refresh</button>
+              <button onclick="deleteScript(${i})" style="color:red;">Delete</button>
+            </div>
+          </div>
+          <pre>${s.content || 'Loading...'}</pre>`;
+    listEl.appendChild(card);
+  });
+}
+
+async function fetchContent(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch');
+  return await res.text();
+}
+
+async function confirmAdd() {
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  if (!name || !url) { alert('Please enter name and URL'); return; }
+  try {
+    const content = await fetchContent(url);
+    scripts.unshift({ name, url, content });
+    localStorage.setItem('scripts', JSON.stringify(scripts));
+    closeModal();
+    render();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function copyScript(i) {
+  navigator.clipboard.writeText(scripts[i].content);
+  alert('Copied!');
+}
+
+async function refreshScript(i) {
+  try {
+    const content = await fetchContent(scripts[i].url);
+    scripts[i].content = content;
+    localStorage.setItem('scripts', JSON.stringify(scripts));
+    render();
+  } catch (e) {
+    alert('Refresh failed: ' + e.message);
+  }
+}
+
+function deleteScript(i) {
+  if (confirm('Delete this script?')) {
+    scripts.splice(i, 1);
+    localStorage.setItem('scripts', JSON.stringify(scripts));
+    render();
+  }
+}
+
+function openModal() {
+  modal.style.display = 'flex';
+  nameInput.value = '';
+  urlInput.value = '';
+}
+
+function closeModal() { modal.style.display = 'none'; }
+
+document.getElementById('addBtn').onclick = openModal;
+window.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+render();
+
+  </script>
+</body>
+</html>a>
                   </div>
                 </CardContent>
               </Card>
